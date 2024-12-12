@@ -1,0 +1,74 @@
+import os
+import csv
+
+# Define the directory containing the script and files
+directory = os.path.dirname(os.path.abspath(__file__))
+
+# Define the CSV file names
+input_csv_file = os.path.join(directory, 'data.csv')
+output_csv_file = os.path.join(directory, 'updated_data.csv')
+
+# Prepare a list to store updated rows
+updated_rows = []
+
+# Process the CSV file
+with open(input_csv_file, mode='r', encoding='utf-8') as file:
+    reader = csv.DictReader(file)
+    fieldnames = [field.strip() for field in reader.fieldnames]  # Strip any leading/trailing whitespace
+
+    for row in reader:
+        # Clean up keys to match the fieldnames
+        row = {key.strip(): value for key, value in row.items()}
+        
+        # Extract the StudentId and File from the current row
+        student_id = row['StudentId']  # Column A
+        file_name = row['File']        # Column R
+
+        # If StudentId is NULL, extract the ID from the File name and set it
+        if not student_id or student_id.strip().lower() == 'null':
+            if '-' in file_name:
+                extracted_id = file_name.split('-')[0]  # Extract the prefix before the dash
+                row['StudentId'] = extracted_id
+                print(f"StudentId was NULL. Set StudentId to: {extracted_id}")
+
+        # Ensure the file exists in the directory
+        original_file_path = os.path.join(directory, file_name)
+        if not os.path.exists(original_file_path):
+            print(f"File {file_name} does not exist. Skipping...")
+            updated_rows.append(row)  # Keep the row unchanged
+            continue
+
+        # Extract the part of the file name after the first dash
+        if '-' in file_name:
+            rest_of_name = file_name.split('-', 1)[1]  # Keeps everything after the first dash
+        else:
+            print(f"File {file_name} does not have a dash. Skipping...")
+            updated_rows.append(row)  # Keep the row unchanged
+            continue
+
+        # Check if the prefix matches the StudentId
+        file_prefix = file_name.split('-')[0]
+        if file_prefix != row['StudentId']:
+            # Construct the corrected file name
+            corrected_file_name = f"{row['StudentId']}-{rest_of_name}"
+            corrected_file_path = os.path.join(directory, corrected_file_name)
+            
+            # Rename the file
+            os.rename(original_file_path, corrected_file_path)
+            print(f"Renamed: {file_name} -> {corrected_file_name}")
+
+            # Update the row with the corrected file name
+            row['File'] = corrected_file_name
+        else:
+            print(f"No changes needed for: {file_name}")
+
+        # Append the row (updated or not) to the list
+        updated_rows.append(row)
+
+# Write the updated rows to a new CSV file
+with open(output_csv_file, mode='w', encoding='utf-8', newline='') as file:
+    writer = csv.DictWriter(file, fieldnames=fieldnames)
+    writer.writeheader()  # Write headers
+    writer.writerows(updated_rows)  # Write updated rows
+
+print(f"Updated CSV saved to {output_csv_file}")
